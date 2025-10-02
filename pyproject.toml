@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "oura_server"
-version = "0.1.0"
+version = "0.1.1"
 description = "Oura Ring OAuth2 MCP server"
 readme = "README.md"
 requires-python = ">=3.12"
