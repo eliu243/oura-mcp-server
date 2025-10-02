@@ -13,6 +13,9 @@ from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 from smithery.decorators import smithery
 
+# Simple in-memory token storage (for session persistence)
+_token_storage = {}
+
 
 class ConfigSchema(BaseModel):
     client_id: str = Field(description="Oura API client ID")
@@ -73,8 +76,9 @@ def create_server():
             response.raise_for_status()
             token_data = response.json()
             
-            # Store the access token in session config
+            # Store the access token in both session config and global storage
             config.access_token = token_data['access_token']
+            _token_storage['access_token'] = token_data['access_token']
             
             return f"✅ Successfully authenticated with Oura Ring!\n\nAccess Token: {token_data['access_token'][:20]}...\nExpires in: {token_data['expires_in']} seconds\nToken Type: {token_data['token_type']}\n\n✅ Access token has been automatically stored. You can now use the sleep data tools!"
             
@@ -113,14 +117,29 @@ def create_server():
         """Manually set the access token in session configuration."""
         config = ctx.session_config
         config.access_token = token
+        _token_storage['access_token'] = token
         return f"✅ Access token set successfully! You can now use the sleep data tools."
+
+    def _get_access_token(ctx: Context) -> str:
+        """Get access token from session config or global storage."""
+        config = ctx.session_config
+        
+        # Try session config first
+        if hasattr(config, 'access_token') and config.access_token:
+            return config.access_token
+        
+        # Fallback to global storage
+        if 'access_token' in _token_storage:
+            return _token_storage['access_token']
+        
+        return None
 
     @server.tool()
     def get_sleep_last_night(ctx: Context) -> str:
         """Get sleep data from last night."""
-        config = ctx.session_config
+        access_token = _get_access_token(ctx)
         
-        if not config.access_token:
+        if not access_token:
             return "❌ Error: No access token found. Please complete OAuth2 authentication first."
         
         try:
@@ -129,7 +148,7 @@ def create_server():
             
             response = httpx.get(
                 f"https://api.ouraring.com/v2/usercollection/sleep",
-                headers={"Authorization": f"Bearer {config.access_token}"},
+                headers={"Authorization": f"Bearer {access_token}"},
                 params={"start_date": yesterday, "end_date": yesterday}
             )
             response.raise_for_status()
@@ -158,9 +177,9 @@ Time in Bed: {sleep.get('time_in_bed', 'N/A')} seconds"""
     @server.tool()
     def get_sleep_last_week(ctx: Context) -> str:
         """Get sleep data from the past week."""
-        config = ctx.session_config
+        access_token = _get_access_token(ctx)
         
-        if not config.access_token:
+        if not access_token:
             return "❌ Error: No access token found. Please complete OAuth2 authentication first."
         
         try:
@@ -170,7 +189,7 @@ Time in Bed: {sleep.get('time_in_bed', 'N/A')} seconds"""
             
             response = httpx.get(
                 f"https://api.ouraring.com/v2/usercollection/sleep",
-                headers={"Authorization": f"Bearer {config.access_token}"},
+                headers={"Authorization": f"Bearer {access_token}"},
                 params={"start_date": start_date, "end_date": end_date}
             )
             response.raise_for_status()
@@ -206,15 +225,15 @@ Time in Bed: {sleep.get('time_in_bed', 'N/A')} seconds"""
     @server.tool()
     def get_sleep_by_date(date: str, ctx: Context) -> str:
         """Get sleep data for a specific date (YYYY-MM-DD format)."""
-        config = ctx.session_config
+        access_token = _get_access_token(ctx)
         
-        if not config.access_token:
+        if not access_token:
             return "❌ Error: No access token found. Please complete OAuth2 authentication first."
         
         try:
             response = httpx.get(
                 f"https://api.ouraring.com/v2/usercollection/sleep",
-                headers={"Authorization": f"Bearer {config.access_token}"},
+                headers={"Authorization": f"Bearer {access_token}"},
                 params={"start_date": date, "end_date": date}
             )
             response.raise_for_status()
