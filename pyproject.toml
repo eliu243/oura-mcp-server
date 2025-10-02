@@ -11,6 +11,8 @@ requires-python = ">=3.8"
 dependencies = [
     "mcp>=1.0.0",
     "httpx>=0.25.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
 ]
 
 [project.scripts]

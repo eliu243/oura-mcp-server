@@ -16,30 +16,22 @@ async def test_server():
     # Create server instance
     server = OuraMCPServer()
     
-    # Test 1: Test auth URL generation (if credentials are available)
-    print("\n1. Testing authentication...")
-    if os.getenv("OURA_CLIENT_ID"):
-        auth_result = await server._handle_auth({"scope": "personal daily"})
-        print("Auth URL generated successfully")
-        print(auth_result.content[0].text[:100] + "...")
-    else:
-        print("Skipping auth test - no credentials found")
-        print("Set OURA_CLIENT_ID and OURA_CLIENT_SECRET to test authentication")
-    
-    # Test 2: Test with invalid token
-    print("\n2. Testing sleep data with invalid token...")
-    server.client = server.client or type('MockClient', (), {
-        'access_token': 'invalid_token'
-    })()
-    
+    # Test 1: Test authentication check
+    print("\n1. Testing authentication check...")
     sleep_result = await server._handle_last_night_sleep({})
-    print("Last night sleep test completed")
+    print("Authentication check completed:")
     print(sleep_result.content[0].text)
     
-    # Test 3: Test week sleep data
+    # Test 2: Test setup auth tool
+    print("\n2. Testing setup auth tool...")
+    setup_result = await server._handle_setup_auth({"access_token": "invalid_token"})
+    print("Setup auth test completed:")
+    print(setup_result.content[0].text)
+    
+    # Test 3: Test week sleep data (should show auth required)
     print("\n3. Testing week sleep data...")
     week_result = await server._handle_week_sleep({})
-    print("Week sleep test completed")
+    print("Week sleep test completed:")
     print(week_result.content[0].text)
     
     print("\nTest completed!")

@@ -125,7 +125,31 @@ class OuraMCPServer:
         self.server = Server("oura-ring")
         self.auth = None
         self.client = None
+        self._token_file = os.path.expanduser("~/.oura_token")
         self._setup_tools()
+        self._load_saved_token()
+    
+    def _load_saved_token(self):
+        """Load saved access token from file."""
+        try:
+            if os.path.exists(self._token_file):
+                with open(self._token_file, 'r') as f:
+                    token_data = json.load(f)
+                    if token_data.get('access_token'):
+                        self.client = OuraClient(token_data['access_token'])
+                        print(f"✅ Loaded saved Oura token (expires: {token_data.get('expires_at', 'unknown')})")
+        except Exception as e:
+            print(f"⚠️ Could not load saved token: {e}")
+    
+    def _save_token(self, token_data):
+        """Save access token to file."""
+        try:
+            token_data['expires_at'] = datetime.now() + timedelta(seconds=token_data.get('expires_in', 2592000))
+            with open(self._token_file, 'w') as f:
+                json.dump(token_data, f)
+            print(f"💾 Saved Oura token to {self._token_file}")
+        except Exception as e:
+            print(f"⚠️ Could not save token: {e}")
         
     def _setup_tools(self):
         """Set up MCP tools."""
@@ -136,50 +160,8 @@ class OuraMCPServer:
             return ListToolsResult(
                 tools=[
                     Tool(
-                        name="oura_auth",
-                        description="Get OAuth2 authorization URL to connect your Oura Ring account",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "scope": {
-                                    "type": "string",
-                                    "description": "OAuth2 scopes to request (default: 'personal daily')",
-                                    "default": "personal daily"
-                                }
-                            }
-                        }
-                    ),
-                    Tool(
-                        name="oura_exchange_code",
-                        description="Exchange authorization code for access token",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "code": {
-                                    "type": "string",
-                                    "description": "Authorization code from OAuth2 callback"
-                                }
-                            },
-                            "required": ["code"]
-                        }
-                    ),
-                    Tool(
-                        name="oura_set_token",
-                        description="Set access token directly (for testing or manual setup)",
-                        inputSchema={
-                            "type": "object",
-                            "properties": {
-                                "access_token": {
-                                    "type": "string",
-                                    "description": "Oura API access token"
-                                }
-                            },
-                            "required": ["access_token"]
-                        }
-                    ),
-                    Tool(
                         name="oura_last_night_sleep",
-                        description="Get sleep score from last night",
+                        description="Get sleep score and detailed data from last night",
                         inputSchema={
                             "type": "object",
                             "properties": {}
@@ -187,10 +169,24 @@ class OuraMCPServer:
                     ),
                     Tool(
                         name="oura_week_sleep",
-                        description="Get sleep scores from the past week",
+                        description="Get sleep scores and trends from the past week",
                         inputSchema={
                             "type": "object",
                             "properties": {}
+                        }
+                    ),
+                    Tool(
+                        name="oura_setup_auth",
+                        description="Set up Oura Ring authentication (one-time setup)",
+                        inputSchema={
+                            "type": "object",
+                            "properties": {
+                                "access_token": {
+                                    "type": "string",
+                                    "description": "Oura API access token from https://cloud.ouraring.com/oauth/applications"
+                                }
+                            },
+                            "required": ["access_token"]
                         }
                     )
                 ]
@@ -200,12 +196,8 @@ class OuraMCPServer:
         async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> CallToolResult:
             """Handle tool calls."""
             
-            if name == "oura_auth":
-                return await self._handle_auth(arguments)
-            elif name == "oura_exchange_code":
-                return await self._handle_exchange_code(arguments)
-            elif name == "oura_set_token":
-                return await self._handle_set_token(arguments)
+            if name == "oura_setup_auth":
+                return await self._handle_setup_auth(arguments)
             elif name == "oura_last_night_sleep":
                 return await self._handle_last_night_sleep(arguments)
             elif name == "oura_week_sleep":
@@ -213,62 +205,29 @@ class OuraMCPServer:
             else:
                 raise ValueError(f"Unknown tool: {name}")
     
-    async def _handle_auth(self, arguments: Dict[str, Any]) -> CallToolResult:
-        """Handle OAuth2 authorization."""
-        scope = arguments.get("scope", "personal daily")
-        
-        # Initialize auth if not already done
-        if not self.auth:
-            client_id = os.getenv("OURA_CLIENT_ID")
-            client_secret = os.getenv("OURA_CLIENT_SECRET")
-            redirect_uri = os.getenv("OURA_REDIRECT_URI", "http://localhost:8080/callback")
-            
-            if not client_id or not client_secret:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text",
-                            text="Error: Oura API credentials not configured. Please set OURA_CLIENT_ID and OURA_CLIENT_SECRET environment variables."
-                        )
-                    ]
-                )
-            
-            self.auth = OuraAuth(client_id, client_secret, redirect_uri)
-        
-        auth_url = self.auth.get_authorization_url(scope=scope)
-        
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=f"Please visit this URL to authorize the application:\n{auth_url}\n\nAfter authorization, use the 'oura_exchange_code' tool with the code from the callback URL."
-                )
-            ]
-        )
-    
-    async def _handle_exchange_code(self, arguments: Dict[str, Any]) -> CallToolResult:
-        """Handle code exchange for access token."""
-        code = arguments["code"]
-        
-        if not self.auth:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="Error: Must call 'oura_auth' first to initialize authentication."
-                    )
-                ]
-            )
+    async def _handle_setup_auth(self, arguments: Dict[str, Any]) -> CallToolResult:
+        """Handle one-time authentication setup."""
+        access_token = arguments["access_token"]
         
         try:
-            token_data = await self.auth.exchange_code_for_token(code)
-            self.client = OuraClient(token_data["access_token"])
+            # Test the token by making a simple API call
+            test_client = OuraClient(access_token)
+            await test_client.get_sleep_data()
+            
+            # If successful, save the token
+            token_data = {
+                "access_token": access_token,
+                "expires_in": 2592000,  # 30 days default
+                "setup_date": datetime.now().isoformat()
+            }
+            self._save_token(token_data)
+            self.client = test_client
             
             return CallToolResult(
                 content=[
                     TextContent(
                         type="text",
-                        text=f"Successfully authenticated! Access token expires in {token_data['expires_in']} seconds.\n\nYou can now use the sleep data tools."
+                        text="✅ Oura Ring authentication set up successfully! Your access token has been saved and you can now access your sleep data."
                     )
                 ]
             )
@@ -277,36 +236,30 @@ class OuraMCPServer:
                 content=[
                     TextContent(
                         type="text",
-                        text=f"Error exchanging code for token: {str(e)}"
+                        text=f"❌ Failed to authenticate with Oura Ring: {str(e)}\n\nPlease check your access token and try again. You can get a new token from https://cloud.ouraring.com/oauth/applications"
                     )
                 ]
             )
     
-    async def _handle_set_token(self, arguments: Dict[str, Any]) -> CallToolResult:
-        """Handle setting access token directly."""
-        access_token = arguments["access_token"]
-        self.client = OuraClient(access_token)
-        
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text="Access token set successfully. You can now use the sleep data tools."
-                )
-            ]
-        )
-    
-    async def _handle_last_night_sleep(self, arguments: Dict[str, Any]) -> CallToolResult:
-        """Handle getting last night's sleep score."""
+    async def _ensure_authenticated(self) -> CallToolResult:
+        """Ensure user is authenticated, show setup instructions if not."""
         if not self.client:
             return CallToolResult(
                 content=[
                     TextContent(
                         type="text",
-                        text="Error: Must authenticate first. Use 'oura_auth' and 'oura_exchange_code' tools, or 'oura_set_token' to set an access token."
+                        text="🔐 Oura Ring authentication required!\n\nTo get your sleep data, you need to set up authentication first:\n\n1. Go to https://cloud.ouraring.com/oauth/applications\n2. Create an application and get an access token\n3. Use the 'oura_setup_auth' tool with your access token\n\nThis is a one-time setup - your token will be saved for future use."
                     )
                 ]
             )
+        return None
+    
+    async def _handle_last_night_sleep(self, arguments: Dict[str, Any]) -> CallToolResult:
+        """Handle getting last night's sleep score."""
+        # Check authentication
+        auth_error = await self._ensure_authenticated()
+        if auth_error:
+            return auth_error
         
         try:
             # Get yesterday's date
@@ -371,15 +324,10 @@ class OuraMCPServer:
     
     async def _handle_week_sleep(self, arguments: Dict[str, Any]) -> CallToolResult:
         """Handle getting past week's sleep scores."""
-        if not self.client:
-            return CallToolResult(
-                content=[
-                    TextContent(
-                        type="text",
-                        text="Error: Must authenticate first. Use 'oura_auth' and 'oura_exchange_code' tools, or 'oura_set_token' to set an access token."
-                    )
-                ]
-            )
+        # Check authentication
+        auth_error = await self._ensure_authenticated()
+        if auth_error:
+            return auth_error
         
         try:
             # Get past week's date range
@@ -440,14 +388,29 @@ class OuraMCPServer:
 
 async def main():
     """Main entry point."""
-    oura_server = OuraMCPServer()
-    
-    async with stdio_server() as (read_stream, write_stream):
-        await oura_server.server.run(
-            read_stream,
-            write_stream,
-            oura_server.server.create_initialization_options()
-        )
+    # Check if we should run as HTTP server (for health checks)
+    if os.getenv("RUN_HTTP_SERVER") == "true":
+        from fastapi import FastAPI
+        import uvicorn
+        
+        app = FastAPI()
+        
+        @app.get("/health")
+        async def health_check():
+            return {"status": "healthy", "service": "oura-mcp"}
+        
+        print("🌐 Starting HTTP server for health checks...")
+        uvicorn.run(app, host="0.0.0.0", port=8080)
+    else:
+        # Run as MCP server
+        oura_server = OuraMCPServer()
+        
+        async with stdio_server() as (read_stream, write_stream):
+            await oura_server.server.run(
+                read_stream,
+                write_stream,
+                oura_server.server.create_initialization_options()
+            )
 
 
 if __name__ == "__main__":

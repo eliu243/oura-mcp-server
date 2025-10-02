@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "oura-ring": {
+      "command": "python3",
+      "args": ["/home/eliu3765/AgentAuth/hw3/oura_mcp/server.py"],
+      "env": {
+        "PYTHONPATH": "/home/eliu3765/AgentAuth/hw3/oura_mcp"
+      }
+    }
+  }
+}

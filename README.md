@@ -4,12 +4,13 @@ An MCP (Model Context Protocol) server that provides access to Oura Ring sleep d
 
 ## Features
 
-- **OAuth2 Authentication**: Secure authentication with Oura API using industry-standard OAuth2 flow
+- **One-Time Setup**: Simple authentication setup that saves your token for future use
+- **Automatic Authentication**: No need to manually handle OAuth2 flows - just use the sleep tools directly
 - **Sleep Score Data**: Get sleep scores from last night or past week
 - **Detailed Sleep Metrics**: Access to comprehensive sleep data including REM, deep, and light sleep durations
 - **Easy Deployment**: Ready for deployment on Smithery with proper configuration
 
-## Setup
+## Local Server Deployment Setup
 
 ### 1. Oura API Credentials
 
@@ -54,18 +55,22 @@ python server.py
 
 The MCP server provides the following tools:
 
-1. **`oura_auth`**: Get OAuth2 authorization URL to connect your Oura Ring account
-2. **`oura_exchange_code`**: Exchange authorization code for access token
-3. **`oura_set_token`**: Set access token directly (for testing)
-4. **`oura_last_night_sleep`**: Get sleep score and data from last night
-5. **`oura_week_sleep`**: Get sleep scores from the past week
+1. **`oura_setup_auth`**: One-time authentication setup with your Oura API access token
+2. **`oura_last_night_sleep`**: Get sleep score and detailed data from last night
+3. **`oura_week_sleep`**: Get sleep scores and trends from the past week
 
-### Authentication Flow
+### Simple Authentication Flow
 
-1. Call `oura_auth` to get the authorization URL
-2. Visit the URL and authorize the application
-3. Use the code from the callback URL with `oura_exchange_code`
-4. Now you can use the sleep data tools
+1. **One-time setup**: Use `oura_setup_auth` with your access token from [Oura Developer Console](https://cloud.ouraring.com/oauth/applications)
+2. **Automatic authentication**: All future requests automatically use your saved token
+3. **Just ask for data**: Use `oura_last_night_sleep` or `oura_week_sleep` directly - no more auth steps needed!
+
+### Getting Your Access Token
+
+1. Go to [Oura Developer Console](https://cloud.ouraring.com/oauth/applications)
+2. Create a new application
+3. Generate an access token
+4. Use the token with `oura_setup_auth` - that's it!
 
 ## Deployment on Smithery
 
