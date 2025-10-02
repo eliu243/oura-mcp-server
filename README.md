@@ -1,36 +1,32 @@
-# Simple Oura Ring OAuth2 MCP Server
+# Oura Ring OAuth2 MCP Server
 
-Minimal MCP server for Oura Ring OAuth2 authentication.
+Simple Oura Ring OAuth2 authentication using FastMCP and Smithery.
 
 ## Setup
 
 1. Install dependencies:
 ```bash
-pip install mcp httpx
+uv sync
 ```
 
-2. Set environment variables:
+2. Test locally:
 ```bash
-export OURA_CLIENT_ID="your_client_id"
-export OURA_CLIENT_SECRET="your_client_secret"
-export OURA_REDIRECT_URI="http://localhost:8080/callback"
-```
-
-3. Run server:
-```bash
-python server.py
+uv run playground
 ```
 
 ## MCP Tools
 
-- `oura_get_auth_url` - Get OAuth2 authorization URL
-- `oura_exchange_code` - Exchange code for access token
+- `get_auth_url` - Get OAuth2 authorization URL
+- `exchange_code` - Exchange code for access token
 
 ## Usage
 
-1. Call `oura_get_auth_url` to get authorization URL
-2. Visit URL and authorize
-3. Use callback code with `oura_exchange_code`
-4. Get your access token
+1. Set session configuration with your Oura API credentials
+2. Call `get_auth_url` to get authorization URL
+3. Visit URL and authorize
+4. Use callback code with `exchange_code`
+5. Get your access token
 
-That's it!
+## Deploy
+
+Push to GitHub and deploy via Smithery dashboard.
