@@ -1,0 +1,36 @@
+name: oura-mcp
+description: MCP server for Oura Ring sleep data
+version: 0.1.0
+
+runtime:
+  python_version: "3.11"
+
+environment_variables:
+  OURA_CLIENT_ID:
+    description: "Oura API client ID from Oura developer console"
+    required: true
+    secret: false
+  OURA_CLIENT_SECRET:
+    description: "Oura API client secret from Oura developer console"
+    required: true
+    secret: true
+  OURA_REDIRECT_URI:
+    description: "OAuth2 redirect URI for your application"
+    required: false
+    secret: false
+    default: "http://localhost:8080/callback"
+
+entrypoint: python server.py
+
+health_check:
+  enabled: true
+  path: "/health"
+  interval: 30
+
+resources:
+  cpu: "0.1"
+  memory: "128Mi"
+
+networking:
+  ports:
+    - 8080
