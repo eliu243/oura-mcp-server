@@ -73,7 +73,10 @@ def create_server():
             response.raise_for_status()
             token_data = response.json()
             
-            return f"✅ Successfully authenticated with Oura Ring!\n\nAccess Token: {token_data['access_token'][:20]}...\nExpires in: {token_data['expires_in']} seconds\nToken Type: {token_data['token_type']}\n\nYou can now use this access token to make API calls to Oura."
+            # Store the access token in session config
+            config.access_token = token_data['access_token']
+            
+            return f"✅ Successfully authenticated with Oura Ring!\n\nAccess Token: {token_data['access_token'][:20]}...\nExpires in: {token_data['expires_in']} seconds\nToken Type: {token_data['token_type']}\n\n✅ Access token has been automatically stored. You can now use the sleep data tools!"
             
         except Exception as e:
             return f"❌ Error exchanging code for token: {str(e)}"
@@ -98,11 +101,19 @@ def create_server():
             if "code" in params:
                 code = params["code"][0]
                 # Automatically exchange the code for a token
-                return exchange_code(code, ctx)
+                result = exchange_code(code, ctx)
+                return result
                 
             return "❌ No access token or authorization code found in URL"
         except Exception as e:
             return f"❌ Error parsing URL: {str(e)}"
+
+    @server.tool()
+    def set_access_token(token: str, ctx: Context) -> str:
+        """Manually set the access token in session configuration."""
+        config = ctx.session_config
+        config.access_token = token
+        return f"✅ Access token set successfully! You can now use the sleep data tools."
 
     @server.tool()
     def get_sleep_last_night(ctx: Context) -> str:
