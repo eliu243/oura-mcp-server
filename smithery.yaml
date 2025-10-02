@@ -1,5 +1,5 @@
-name: oura-mcp
-description: MCP server for Oura Ring sleep data
+name: oura-auth
+description: Simple Oura Ring OAuth2 authentication
 version: 0.1.0
 
 runtime: container
@@ -10,28 +10,19 @@ startCommand:
 
 environmentVariables:
   OURA_CLIENT_ID:
-    description: "Oura API client ID from Oura developer console"
+    description: "Oura API client ID"
     required: true
     secret: false
   OURA_CLIENT_SECRET:
-    description: "Oura API client secret from Oura developer console"
+    description: "Oura API client secret"
     required: true
     secret: true
   OURA_REDIRECT_URI:
-    description: "OAuth2 redirect URI for your application"
+    description: "OAuth2 redirect URI"
     required: false
     secret: false
     default: "http://localhost:8080/callback"
 
-healthCheck:
-  enabled: true
-  path: "/health"
-  interval: 30
-
 resources:
   cpu: "0.1"
   memory: "128Mi"
-
-networking:
-  ports:
-    - 8080
